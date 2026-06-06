@@ -157,6 +157,8 @@ def get_client(provider: str):
             api_key=os.environ.get("OPENROUTER_API_KEY"),
             base_url=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
             default_headers=headers,
+            timeout=float(os.environ.get("OPENROUTER_TIMEOUT", "120")),
+            max_retries=int(os.environ.get("OPENROUTER_MAX_RETRIES", "3")),
         )
     elif provider == "azure-llama":
         azure_key = os.environ.get("AZURE_LLAMA_API_KEY")
