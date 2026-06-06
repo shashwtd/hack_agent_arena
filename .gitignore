@@ -1,12 +1,25 @@
 # Secrets
 .env
+*.env.local
 
 # Python env
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
 
 # AppWorld runtime artifacts (downloaded / generated locally)
 data/
 experiments/
 logs/
+*.log
+
+# Local self-improving skill cache (rebuildable from experiment outputs)
+memory/
+memory_backup_*/
+
+# Local probes and scratch scripts
+scripts/probe_*.py

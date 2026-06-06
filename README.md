@@ -1,80 +1,119 @@
-# ://agent_arena
+# HydraDB Agent Arena
 
-Build an **autonomous AI agent** that completes everyday-app tasks in
-[AppWorld](https://appworld.dev). You are ranked by **Task Goal Completion (TGC)** —
-the percentage of tasks your agent fully completes.
+Autonomous AppWorld agent for `://agent_arena`. The agent reads a supervisor
+task, writes Python code against AppWorld APIs, verifies its answer or mutation,
+and completes the task with `apis.supervisor.complete_task(...)`.
 
-## What AppWorld is
-A simulated world of **9 apps** (Spotify, Gmail, Venmo, Amazon, Splitwise, Phone,
-File System, Simple Note, + `supervisor`/`api_docs`), **457 APIs**, and ~100
-simulated people. Your agent reads a natural-language instruction from its
-"supervisor" and acts by **writing Python code** that calls the apps' APIs.
+## What We Added
 
-## 1. Setup (~3 min) — needs Python 3.11
+- Provider/model routing: `MODEL`, `ROUTER_MODEL`, `SOLVER_MODEL`,
+  `ERROR_MODEL`, `VERIFIER_MODEL`, and `DISTILLER_MODEL` accept
+  `provider/model` strings. The default target is OpenRouter Llama 3.3 70B:
+  `openrouter/meta-llama/llama-3.3-70b-instruct`.
+- OpenAI-compatible backends: OpenRouter, Groq, OpenAI, Anthropic, and the
+  legacy Azure Llama backend are routed from one agent loop.
+- HydraDB memory: successful and failed trajectories can be distilled into
+  reusable skills/lessons with `scripts/extract_trajectories.py`. Runtime recall
+  injects verified memory hints while treating live AppWorld API docs as the
+  source of truth.
+- Verified-only memory by default: in-run captures are off unless explicitly
+  enabled, which avoids poisoning future tasks with unverified completions.
+- Solver prompt improvements: the agent now emphasizes schema inspection,
+  credential/login patterns, lowercase app namespaces, exact answer shape, and
+  concise evidence before completion.
+- Completion verifier: answer tasks are checked before submission for empty or
+  guessed answers, missing evidence, suspicious counts, bad top-N shape, and
+  ignored errors.
+- Pagination, inspection, and ranking safeguards: prompts tell the solver to
+  exhaust paginated list APIs, print sample keys before reading fields, fetch
+  authoritative detail records for ranking metrics, and deduplicate entities.
+- Relative-date handling: the AppWorld task datetime is injected and must be used
+  for "today", "this year", "last month", and similar relative dates.
+- Mutation completeness: payment/message/create/update tasks are prompted to
+  include exact amounts, recipients, titles, notes, descriptions, dates, and
+  follow-up messages before completion.
+
+## Setup
+
+Use Python 3.11.
+
 ```bash
-git clone git@github.com:interface4agi/hack_agent_arena.git
-cd hack_agent_arena
-bash setup.sh                 # installs uv+py3.11, appworld + data, creates .env; verifies
+bash setup.sh
 source .venv/bin/activate
+cp .env.example .env
 ```
-Then give the agent a model. **For fair scoring, everyone runs the same model:
-Groq's Llama 3.3 70B — free, fast, no billing, no card.**
 
-1. Get a free key at **[console.groq.com](https://console.groq.com)** → sign in with
-   GitHub/Google → **API Keys → Create**.
-2. Put it in **`.env`**:
-   ```
-   GROQ_API_KEY=...
-   ```
-3. That's it — the agent already defaults to `MODEL=groq/llama-3.3-70b-versatile`.
-   It runs in the cloud, so any laptop works — no GPU needed.
+Add your OpenRouter key to `.env`:
 
-> The agent runs on [litellm](https://docs.litellm.ai), so `MODEL` is a
-> `provider/model` string. You may use a different backend while **developing**
-> (`gemini/gemini-2.0-flash`, `anthropic/claude-haiku-4-5`, `ollama/llama3.1`, …),
-> but **submitted/scored runs must use `groq/llama-3.3-70b-versatile`** so every
-> team is compared on equal footing. (AppWorld itself needs no key — you can
-> `appworld play` and hand-solve tasks offline.)
-
-## 2. Smoke-test the starter agent (2 tasks)
 ```bash
-export APPWORLD_EXPERIMENT=team_<yourname>     # your UNIQUE team id
-export APPWORLD_DATASET=dev MAX_TASKS=2
-python agent.py
+OPENROUTER_API_KEY=...
+MODEL=openrouter/meta-llama/llama-3.3-70b-instruct
 ```
-`agent.py` is a working ReAct code agent — read it, then make it smarter
-(planning, error recovery, better prompts, retrieval over `apis.api_docs`, …).
 
-Explore a task world by hand: `appworld play`
+If OpenRouter changes the slug, set:
 
-## 3. The rules your agent plays by
-- One Python code block per turn; whatever you `print()` comes back as the next observation.
-- Discover APIs at runtime:
-  `apis.api_docs.show_api_descriptions(app_name='spotify')`, then
-  `apis.api_docs.show_api_doc(app_name='spotify', api_name='login')`.
-- Get credentials: `apis.supervisor.show_account_passwords()`, then log into each app.
-- Finish a task: `apis.supervisor.complete_task(answer=<answer or None>)`.
+```bash
+OPENROUTER_LLAMA_MODEL=meta-llama/llama-3.3-70b-instruct
+```
 
-## 4. Submit (at each checkpoint)
-1. Run your agent on the **official split** the organizers announce
-   (default `test_normal`, 168 tasks):
-   ```bash
-   export APPWORLD_DATASET=test_normal MAX_TASKS=0
-   python agent.py
-   ```
-2. Self-evaluate:
-   ```bash
-   appworld evaluate $APPWORLD_EXPERIMENT test_normal
-   ```
-3. Zip and submit your whole output folder:
-   `experiments/outputs/$APPWORLD_EXPERIMENT/`
-   It must include `evaluations/test_normal.json` and the `tasks/<id>/dbs/` folders.
+Other supported examples:
 
-## Scoring
-- **TGC** (primary) — % of tasks fully completed. **SGC** (scenario goal completion) breaks ties.
-- 🐉 **Bonus:** teams that integrate **HydraDB** into their agent's architecture
-  earn extra credit (ask organizers for details).
-- Reference baseline on `test_normal`: ReAct + GPT-4o ≈ **48.8 TGC**. Beat it.
+```bash
+MODEL=groq/llama-3.3-70b-versatile
+MODEL=openai/gpt-5.4-mini
+MODEL=anthropic/claude-opus-4-8
+MODEL=azure-llama
+```
 
----
-Built for **://agent_arena** · benchmark: [AppWorld](https://github.com/StonyBrookNLP/appworld) (ACL'24 Best Resource Paper)
+## Run And Evaluate
+
+Short development smoke test:
+
+```bash
+export APPWORLD_EXPERIMENT=team_openrouter_smoke
+export APPWORLD_DATASET=dev
+export MAX_TASKS=3
+python agent.py
+appworld evaluate team_openrouter_smoke dev
+```
+
+Official organizer eval set:
+
+```bash
+mkdir -p data/datasets
+cp eval/agent_arena_eval.txt data/datasets/agent_arena_eval.txt
+export APPWORLD_EXPERIMENT=team_<name>
+export APPWORLD_DATASET=agent_arena_eval
+export MAX_TASKS=0
+python agent.py
+appworld evaluate team_<name> agent_arena_eval
+```
+
+See `EVAL.md` and `SUBMISSION.md` for the organizer-provided eval set and
+submission format.
+
+## HydraDB Memory Workflow
+
+Enable HydraDB by adding a key to `.env`:
+
+```bash
+HYDRA_DB_API_KEY=...
+ENABLE_MEMORY=1
+MEMORY_VERIFIED_ONLY=1
+```
+
+After a run, distill verified trajectories into the local memory cache and
+HydraDB:
+
+```bash
+python scripts/extract_trajectories.py --experiment team_<name> --dataset dev
+```
+
+Use `--no-llm` for deterministic extraction, or `--dry-run` to inspect what would
+be stored. The script scrubs secrets before persisting skills.
+
+## Repo Hygiene
+
+Do not commit `.env`, API keys, `memory/`, `memory_backup_*`, probe scripts,
+terminal logs, caches, or local AppWorld outputs unless they are the exact
+official submission artifacts requested by organizers.

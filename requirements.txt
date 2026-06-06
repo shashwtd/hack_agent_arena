@@ -1,3 +1,7 @@
 appworld
-litellm
+anthropic
+openai
+azure-identity
+pydantic<2
 python-dotenv
+hydradb-sdk
