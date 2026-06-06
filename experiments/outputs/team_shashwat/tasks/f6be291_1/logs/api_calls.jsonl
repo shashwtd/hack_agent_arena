@@ -1,0 +1,42 @@
+{"method": "get", "url": "/supervisor/account_passwords", "data": {}}
+{"method": "get", "url": "/api_docs/app_descriptions", "data": {}}
+{"method": "get", "url": "/api_docs/api_descriptions", "data": {"app_name": "gmail"}}
+{"method": "get", "url": "/api_docs/api_descriptions", "data": {"app_name": "amazon"}}
+{"method": "get", "url": "/api_docs/api_descriptions", "data": {"app_name": "amazon"}}
+{"method": "post", "url": "/amazon/auth/token", "data": {"username": "pa_ritter@gmail.com", "password": ")Lun@YH"}}
+{"method": "get", "url": "/amazon/addresses", "data": {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbWF6b24rcGFfcml0dGVyQGdtYWlsLmNvbSIsImV4cCI6MTY4NDQxMjA5OH0.mmbKBDmRAhkQ7WE3CCjBKyKp30UuF4GhA3jEJ5n9KIU"}}
+{"method": "get", "url": "/amazon/payment_cards", "data": {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbWF6b24rcGFfcml0dGVyQGdtYWlsLmNvbSIsImV4cCI6MTY4NDQxMjA5OH0.mmbKBDmRAhkQ7WE3CCjBKyKp30UuF4GhA3jEJ5n9KIU"}}
+{"method": "get", "url": "/amazon/products", "data": {"query": "Coca-Cola 2 liter bottle", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"query": "Coca-Cola", "page_limit": 20}}
+{"method": "get", "url": "/amazon/product_types", "data": {"query": "soda"}}
+{"method": "get", "url": "/api_docs/api_doc", "data": {"app_name": "amazon", "api_name": "search_product_types"}}
+{"method": "get", "url": "/amazon/product_types", "data": {"query": "soda", "page_limit": 20}}
+{"method": "get", "url": "/api_docs/api_doc", "data": {"app_name": "amazon", "api_name": "search_products"}}
+{"method": "get", "url": "/amazon/products", "data": {"query": "potato chips", "page_limit": 5}}
+{"method": "get", "url": "/amazon/product_types", "data": {"query": "food"}}
+{"method": "get", "url": "/api_docs/api_doc", "data": {"app_name": "amazon", "api_name": "show_product_feature_choices"}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "soda", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "beverage", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "snack", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "condiment", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "chips", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "cookies", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "ketchup", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "mustard", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "cola", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "grocery", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "food", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "drink", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "beverage", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "snack", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "sauce", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "chip", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "cookie", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "candy", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "juice", "page_limit": 5}}
+{"method": "get", "url": "/amazon/products", "data": {"product_type": "water", "page_limit": 5}}
+{"method": "post", "url": "/gmail/auth/token", "data": {"username": "pa_ritter@gmail.com", "password": "}v0#GvJ"}}
+{"method": "get", "url": "/api_docs/api_doc", "data": {"app_name": "gmail", "api_name": "show_inbox_threads"}}
+{"method": "post", "url": "/gmail/auth/token", "data": {"username": "pa_ritter@gmail.com", "password": "}v0#GvJ"}}
+{"method": "get", "url": "/gmail/email_threads/category/inbox", "data": {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnbWFpbCtwYV9yaXR0ZXJAZ21haWwuY29tIiwiZXhwIjoxNjg0NDEyNzMxfQ.wbPNao43acmve2N1Yr5laqrW0JfrK0YlaYET3WyxriE", "page_limit": 20}}
+{"method": "get", "url": "/gmail/emails/20867", "data": {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnbWFpbCtwYV9yaXR0ZXJAZ21haWwuY29tIiwiZXhwIjoxNjg0NDEyNzMxfQ.wbPNao43acmve2N1Yr5laqrW0JfrK0YlaYET3WyxriE"}}
