@@ -361,6 +361,35 @@ class HydraMemory:
 
         return self._ingest_with_retry(_do)
 
+    def ingest_text_docs(self, docs: list[tuple[str, str, dict]]) -> bool:
+        """Ingest arbitrary knowledge documents (used by the ACE playbook).
+
+        ``docs`` is a list of ``(doc_id, markdown_text, metadata_dict)``. Each
+        doc is mirrored into HydraDB ``knowledge`` so the playbook persists and
+        is semantically recallable across runs (the HydraDB bonus story).
+        """
+        if not docs:
+            return True
+        if not self.ensure_tenant():
+            return False
+        client = self._get_client()
+        documents = [
+            (f"{doc_id}.md", scrub_secrets(text).encode("utf-8"), "text/markdown")
+            for doc_id, text, _meta in docs
+        ]
+        meta = json.dumps([m for _id, _t, m in docs])
+
+        def _do():
+            client.context.ingest(
+                tenant_id=self.tenant_id,
+                type="knowledge",
+                upsert=True,
+                documents=documents,
+                document_metadata=meta,
+            )
+
+        return self._ingest_with_retry(_do)
+
     def ingest_lesson(self, skill: Skill) -> bool:
         if not self.ensure_tenant():
             return False

@@ -32,6 +32,11 @@ and completes the task with `apis.supervisor.complete_task(...)`.
 - Mutation completeness: payment/message/create/update tasks are prompted to
   include exact amounts, recipients, titles, notes, descriptions, dates, and
   follow-up messages before completion.
+- **ACE evolving playbook** (`appworld_playbook.py`): an Agentic Context
+  Engineering (arXiv:2510.04618) "playbook" of itemized, GENERAL strategy /
+  API-pattern / gotcha bullets that is injected into the solver context each
+  task. Backed by the local cache **and HydraDB**, grown offline from execution
+  feedback (no ground-truth labels). Toggle with `ENABLE_PLAYBOOK` (default on).
 
 ## Setup
 
@@ -111,6 +116,55 @@ python scripts/extract_trajectories.py --experiment team_<name> --dataset dev
 
 Use `--no-llm` for deterministic extraction, or `--dry-run` to inspect what would
 be stored. The script scrubs secrets before persisting skills.
+
+## ACE Playbook (Agentic Context Engineering)
+
+The playbook is an evolving **context** rather than a per-task skill recall. It
+follows the ACE paper (arXiv:2510.04618): contexts are comprehensive, itemized
+playbooks of reusable bullets that accumulate strategies, domain concepts, API
+patterns, and common failure modes — never task-specific answers.
+
+Roles map onto the existing system:
+
+- **Generator** — the ReAct loop in `agent.py` solves a task and emits a trace.
+- **Reflector** — `scripts/build_playbook.py` distills concrete, GENERAL bullets
+  from each trajectory using **execution feedback only** (completion + recurring
+  errors); no ground-truth labels are required (`--use-eval` is optional).
+- **Curator** — `Playbook.merge_delta`: a lightweight, non-LLM merge with
+  string/semantic de-duplication ("grow-and-refine"); `Playbook.refine`
+  consolidates near-duplicates and caps each section.
+
+Each bullet carries metadata (`bullet_id`, `helpful`/`harmful` counters,
+`section`, `apps`, `source`). A defensive `is_general` guard rejects any bullet
+that references a concrete `task_id`, embeds a literal `complete_task` answer, or
+otherwise looks task-specific, so the playbook can never leak memorized answers.
+
+Storage (HydraDB bonus): every bullet is mirrored into HydraDB `knowledge`
+(`pb_<id>.md`) for cross-run persistence and semantic recall, alongside the
+deterministic local cache at `memory/playbook.jsonl`. At inference the top-K
+most relevant bullets (apps-aware, then general) are rendered into the solver
+context within a token budget; set `PLAYBOOK_HYDRA_TOPK>0` to additionally fold
+in HydraDB-recalled bullets at inject time.
+
+Offline warmup and inspection:
+
+```bash
+# seed the general defaults + push to HydraDB
+python scripts/build_playbook.py --seed --sync-hydra
+
+# reflect over a finished dev run's trajectories (Reflector + Curator)
+python scripts/build_playbook.py --experiment team_<dev_run> --dataset dev
+
+# consolidate near-duplicates (grow-and-refine)
+python appworld_playbook.py --refine --refine-threshold 0.45 --per-section-cap 8
+
+# inspect what gets injected for a given app mix
+python appworld_playbook.py --show --apps spotify,phone
+```
+
+Relevant env flags: `ENABLE_PLAYBOOK` (default 1), `PLAYBOOK_AUTOSEED`,
+`PLAYBOOK_MAX_BULLETS`, `PLAYBOOK_CHAR_BUDGET`, `PLAYBOOK_HYDRA_TOPK`,
+`PLAYBOOK_DEDUP_THRESHOLD`.
 
 ## Repo Hygiene
 

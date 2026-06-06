@@ -50,6 +50,14 @@ except Exception as _exc:  # never let memory import break the agent
     SkillMemory = None  # type: ignore
     _MEMORY_IMPORT_ERROR = _exc
 
+try:  # ACE-style evolving playbook (general strategies, HydraDB-backed)
+    from appworld_playbook import Playbook, seed_playbook
+    _PLAYBOOK_IMPORT_ERROR = None
+except Exception as _exc:  # never let the playbook break the agent
+    Playbook = None  # type: ignore
+    seed_playbook = None  # type: ignore
+    _PLAYBOOK_IMPORT_ERROR = _exc
+
 # ---- config ---------------------------------------------------------------
 # MODEL and role model env vars accept provider/model or provider:model strings:
 #   openrouter/meta-llama/llama-3.3-70b-instruct
@@ -89,6 +97,19 @@ ENABLE_MEMORY = os.environ.get("ENABLE_MEMORY", "1") != "0"
 ENABLE_MEMORY_CAPTURE = os.environ.get("ENABLE_MEMORY_CAPTURE", "0") != "0"
 MEMORY_TOP_K = int(os.environ.get("MEMORY_TOP_K", "3"))
 MEMORY_CHAR_BUDGET = int(os.environ.get("MEMORY_CHAR_BUDGET", "900"))
+
+# ---- ACE playbook (evolving general strategy bullets) ---------------------
+# The playbook is the ACE context: itemized GENERAL strategies/gotchas injected
+# into the solver each task. It is seeded with the lessons in this system prompt
+# and grown offline by scripts/build_playbook.py (Reflector + Curator). Toggle
+# with ENABLE_PLAYBOOK for clean A/B comparisons.
+ENABLE_PLAYBOOK = os.environ.get("ENABLE_PLAYBOOK", "1") != "0"
+PLAYBOOK_AUTOSEED = os.environ.get("PLAYBOOK_AUTOSEED", "1") != "0"
+PLAYBOOK_MAX_BULLETS = int(os.environ.get("PLAYBOOK_MAX_BULLETS", "40"))
+PLAYBOOK_CHAR_BUDGET = int(os.environ.get("PLAYBOOK_CHAR_BUDGET", "6000"))
+# pull a couple of semantically-relevant bullets from HydraDB at inject time so
+# HydraDB is genuinely in the retrieval path (the bonus integration).
+PLAYBOOK_HYDRA_TOPK = int(os.environ.get("PLAYBOOK_HYDRA_TOPK", "0"))
 
 _CLIENTS = {}
 
@@ -175,6 +196,25 @@ def _init_memory():
 
 
 MEMORY = _init_memory()
+
+
+def _init_playbook():
+    if not ENABLE_PLAYBOOK or Playbook is None:
+        if _PLAYBOOK_IMPORT_ERROR is not None:
+            print(f"  [playbook] disabled (import error: {_PLAYBOOK_IMPORT_ERROR})")
+        return None
+    try:
+        pb = Playbook()
+        if PLAYBOOK_AUTOSEED and len(pb) == 0 and seed_playbook is not None:
+            report = seed_playbook(pb)
+            print(f"  [playbook] seeded defaults: {report}")
+        return pb
+    except Exception as exc:
+        print(f"  [playbook] disabled (init error: {exc})")
+        return None
+
+
+PLAYBOOK = _init_playbook()
 
 SYSTEM_PROMPT = """You are an autonomous coding agent operating inside AppWorld.
 You complete the supervisor's task by writing Python code that the environment executes.
@@ -263,14 +303,20 @@ RULES:
             page += 1
         return out
 - Action / mutation completeness (payments, messages, creating records):
+  - Before ANY mutating call, read that API's doc in an EARLIER turn and use the
+    EXACT parameter names it lists. Do NOT fetch the doc and call the API in the
+    same block — you cannot adapt to the real names that way, and a guessed
+    keyword is silently ignored (e.g. a payment "note" is usually the parameter
+    named `description`, not `note`).
   - Pass EVERY detail the task specifies. If it names a memo/note/description,
     an exact amount, an exact message text, a recipient, a date, or a title,
-    include each one in the API call. Optional-looking fields like
-    note/description are graded — never omit them.
+    map each to the correct documented parameter and include it. Optional-looking
+    fields like description are graded — never omit them.
   - Extract values precisely from the source (the conversation, bill, email).
     Do not approximate or guess an amount; read the exact number from the data.
   - After the mutation, re-read the task and confirm each required field was set
-    with the exact requested value before completing.
+    with the exact requested value (re-fetch the created record if possible)
+    before completing.
 - Relative dates: treat the environment "now" given in the task context as the
   current date. Compute "today / this year / last year / this month / recent"
   from THAT date, never from real-world wall-clock time. If no current date was
@@ -608,6 +654,38 @@ def retrieve_skills(instruction: str, task_profile: str) -> str:
     )
 
 
+def retrieve_playbook(instruction: str, task_profile: str) -> str:
+    """Render the ACE playbook (general strategies) for the solver context."""
+    if PLAYBOOK is None:
+        return ""
+    apps_hint = apps_from_profile(task_profile)
+    try:
+        block = PLAYBOOK.render(
+            apps_hint=apps_hint,
+            max_bullets=PLAYBOOK_MAX_BULLETS,
+            char_budget=PLAYBOOK_CHAR_BUDGET,
+        )
+    except Exception as exc:
+        print(f"  [playbook] render error: {exc}")
+        return ""
+    if not block:
+        return ""
+    # optionally fold in a few HydraDB-recalled bullets (keeps HydraDB in the
+    # live retrieval path); deduped by HydraDB content, advisory only.
+    if PLAYBOOK_HYDRA_TOPK > 0:
+        try:
+            query = f"{instruction}\nApps: {', '.join(apps_hint)}"
+            extra = PLAYBOOK.recall_hydra(query, k=PLAYBOOK_HYDRA_TOPK)
+            if extra:
+                block += "\n\n## related (HydraDB recall)\n" + "\n".join(
+                    f"- {e.strip()[:300]}" for e in extra
+                )
+        except Exception:
+            pass
+    print(f"  playbook: {len(PLAYBOOK)} bullet(s) (hydra={PLAYBOOK.hydra_enabled})")
+    return block
+
+
 def capture_skill(world: AppWorld, messages: list[dict], task_profile: str, completed: bool) -> None:
     """Lightweight within-run capture so similar later tasks can reuse the flow."""
     if MEMORY is None or Skill is None or not ENABLE_MEMORY_CAPTURE:
@@ -657,6 +735,7 @@ def error_signature(output: str) -> str | None:
 def solve(world: AppWorld) -> None:
     task_profile = classify_task(world)
     print(f"  route: {preview(task_profile)}")
+    playbook_block = retrieve_playbook(str(world.task.instruction), task_profile)
     skills_block = retrieve_skills(str(world.task.instruction), task_profile)
     env_now = getattr(world.task, "datetime", None)
     messages = [{
@@ -668,6 +747,7 @@ def solve(world: AppWorld) -> None:
                if env_now else "")
             + f"Task: {world.task.instruction}\n\n"
             f"Task profile: {task_profile}\n\n"
+            + (playbook_block + "\n\n" if playbook_block else "")
             + (skills_block + "\n\n" if skills_block else "")
             + "Begin. One Python code block per turn. First discover docs and "
             "inspect real data shapes, paginate all lists, then compute and "
@@ -773,6 +853,10 @@ def main() -> None:
         print(f"Memory: enabled (hydra={MEMORY.hydra_enabled}, top_k={MEMORY_TOP_K})")
     else:
         print("Memory: disabled")
+    if PLAYBOOK is not None:
+        print(f"Playbook: enabled ({len(PLAYBOOK)} bullets, hydra={PLAYBOOK.hydra_enabled})")
+    else:
+        print("Playbook: disabled")
     for i, task_id in enumerate(task_ids, 1):
         print(f"[{i}/{len(task_ids)}] {task_id}")
         with AppWorld(task_id=task_id, experiment_name=EXPERIMENT) as world:
